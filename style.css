@@ -1,0 +1,468 @@
+body {
+    font-family: 'Arial', sans-serif;
+    background-color: #f0f2f5;
+    color: #333;
+    margin: 0;
+    padding: 20px;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    min-height: 100vh;
+}
+
+.container {
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    padding: 30px;
+    width: 100%;
+    max-width: 900px;
+    box-sizing: border-box;
+}
+
+h1 {
+    text-align: center;
+    color: #007bff;
+    margin-bottom: 30px;
+}
+
+.section {
+    margin-bottom: 30px;
+    padding: 20px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    background-color: #fafafa;
+}
+
+.section h2 {
+    color: #555;
+    margin-top: 0;
+    margin-bottom: 15px;
+    text-align: center;
+}
+
+hr {
+    border: none;
+    border-top: 1px dashed #ccc;
+    margin: 40px 0;
+}
+
+/* Team Selection Area */
+#team-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: center;
+    margin-bottom: 20px;
+}
+
+.team-btn {
+    background-color: #e2e6ea;
+    border: 1px solid #ccc;
+    padding: 10px 15px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background-color 0.3s, border-color 0.3s;
+}
+
+.team-btn:hover {
+    background-color: #d3d9e0;
+}
+
+.team-btn.selected {
+    background-color: #007bff;
+    color: white;
+    border-color: #007bff;
+}
+
+#user-team-details {
+    padding: 15px;
+    border: 1px dashed #b0d8ff;
+    background-color: #e6f3ff;
+    border-radius: 5px;
+}
+
+#user-team-details h3 {
+    text-align: center;
+    color: #0056b3;
+}
+
+#retention-list {
+    margin-top: 15px;
+    max-height: 300px;
+    overflow-y: auto;
+    border-top: 1px solid #cee;
+    padding-top: 10px;
+}
+
+.retention-player-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px dotted #e0e0e0;
+}
+
+.retention-player-item:last-child {
+    border-bottom: none;
+}
+
+.retention-player-item input[type="checkbox"] {
+    margin-right: 10px;
+}
+
+#confirm-retention-btn {
+    display: block;
+    width: fit-content;
+    margin: 20px auto 0;
+    padding: 10px 20px;
+    background-color: #28a745;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+#confirm-retention-btn:hover {
+    background-color: #218838;
+}
+
+/* Auction Board */
+.current-player-display {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    margin-bottom: 30px;
+    background-color: #fff;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+}
+
+.player-photo-container {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    overflow: hidden;
+    flex-shrink: 0;
+    border: 3px solid #007bff;
+}
+
+#player-photo {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.player-info h3 {
+    margin-top: 0;
+    color: #0056b3;
+}
+
+.player-info p {
+    margin: 5px 0;
+    font-size: 1.1em;
+}
+
+.bidding-area {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.bidding-area p {
+    font-size: 1.2em;
+    font-weight: bold;
+    margin-bottom: 10px;
+}
+
+.bid-input-container {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 15px;
+}
+
+#user-bid-input {
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    width: 150px;
+    font-size: 16px;
+}
+
+#place-bid-btn,
+#skip-bid-btn,
+#auction-details-btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+#place-bid-btn {
+    background-color: #007bff;
+    color: white;
+}
+
+#place-bid-btn:hover {
+    background-color: #0056b3;
+}
+
+#skip-bid-btn {
+    background-color: #dc3545;
+    color: white;
+}
+
+#skip-bid-btn:hover {
+    background-color: #c82333;
+}
+
+#auction-details-btn {
+    background-color: #6c757d;
+    color: white;
+    margin-top: 20px;
+    width: fit-content;
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+#auction-details-btn:hover {
+    background-color: #5a6268;
+}
+
+/* Auction Log */
+#auction-log {
+    list-style: none;
+    padding: 0;
+    max-height: 250px;
+    overflow-y: auto;
+    border: 1px solid #eee;
+    background-color: #fff;
+    border-radius: 5px;
+    padding: 10px;
+}
+
+#auction-log li {
+    padding: 8px 0;
+    border-bottom: 1px dotted #f0f0f0;
+    font-size: 0.95em;
+}
+
+#auction-log li:last-child {
+    border-bottom: none;
+}
+
+.sold-log-entry {
+    color: #28a745;
+    font-weight: bold;
+}
+
+/* Hidden Utility Class */
+.hidden {
+    display: none !important;
+}
+
+/* Auction Details Pop-up */
+.details-popup {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.details-content {
+    background-color: #fff;
+    padding: 30px;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 800px;
+    max-height: 90vh;
+    overflow-y: auto;
+    position: relative;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+}
+
+.details-content h2 {
+    text-align: center;
+    margin-bottom: 25px;
+    color: #007bff;
+}
+
+.details-options {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    margin-bottom: 25px;
+    flex-wrap: wrap;
+}
+
+.details-options button {
+    padding: 12px 25px;
+    background-color: #17a2b8;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    font-size: 1.1em;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+.details-options button:hover {
+    background-color: #138496;
+}
+
+.close-btn {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    background: none;
+    border: none;
+    font-size: 30px;
+    color: #aaa;
+    cursor: pointer;
+}
+
+.close-btn:hover {
+    color: #333;
+}
+
+#details-view {
+    border: 1px solid #e0e0e0;
+    padding: 15px;
+    border-radius: 5px;
+    background-color: #fcfcfc;
+}
+
+/* Styles for Player List, Purse Remaining, Current Squad */
+#details-view table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+}
+
+#details-view th,
+#details-view td {
+    border: 1px solid #eee;
+    padding: 10px;
+    text-align: left;
+}
+
+#details-view th {
+    background-color: #f2f2f2;
+    font-weight: bold;
+}
+
+.team-squad-section {
+    margin-bottom: 20px;
+    border: 1px solid #cceeff;
+    border-radius: 5px;
+    padding: 15px;
+    background-color: #e6f7ff;
+}
+
+.team-squad-section h3 {
+    text-align: center;
+    color: #0056b3;
+    margin-top: 0;
+}
+
+.squad-role-category {
+    margin-bottom: 15px;
+}
+
+.squad-role-category h4 {
+    background-color: #a0d9ff;
+    color: white;
+    padding: 8px;
+    border-radius: 4px;
+    margin-top: 0;
+    margin-bottom: 10px;
+}
+
+.squad-player-list {
+    list-style: none;
+    padding: 0;
+}
+
+.squad-player-list li {
+    padding: 5px 0;
+    border-bottom: 1px dotted #e0e0e0;
+}
+
+.squad-player-list li:last-child {
+    border-bottom: none;
+}
+
+
+/* Responsiveness */
+@media (max-width: 768px) {
+    .container {
+        padding: 20px;
+    }
+
+    .current-player-display {
+        flex-direction: column;
+        text-align: center;
+    }
+
+    .bid-input-container {
+        flex-direction: column;
+        align-items: center;
+    }
+
+    #user-bid-input {
+        width: 80%;
+    }
+
+    #place-bid-btn,
+    #pass-bid-btn,
+    #auction-details-btn {
+        width: 80%;
+    }
+
+    .details-options {
+        flex-direction: column;
+    }
+}
+
+@media (width <=500px) {
+
+    .details-content {
+        padding: 10px;
+    }
+
+    #details-view table {
+        display: flex;
+        flex-direction: column;
+        gap: 30px;
+        overflow-x: auto;
+        margin-inline: 1px;
+        padding-block-end: 40px;
+        /* margin-block-end: 20px; */
+        scroll-snap-type: inline mandatory;
+        
+
+        /* & thead tr th:nth-child(1) {
+            padding-left: 35px;
+            padding-right: 35px;
+        } */
+
+        /* & thead tr th:nth-child(2) {
+            padding-left: 34px;
+            padding-right: 34px;
+        } */
+
+    }
+}

@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IPL Mega Auction 2025 Simulator</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="container">
+        <h1>IPL Mega Auction 2025 Simulator</h1>
+
+        <div id="team-selection-area" class="section">
+            <h2>Select Your Team</h2>
+            <div id="team-buttons">
+            </div>
+            <div id="user-team-details" class="hidden">
+                <h3>Your Team: <span id="selected-team-name"></span> - 2024 Squad</h3>
+                <p>You can retain a maximum of 6 players.</p>
+                <div id="retention-list">
+                </div>
+                <button id="confirm-retention-btn">Confirm Retention</button>
+            </div>
+        </div>
+
+        <hr>
+
+        <div id="auction-board" class="section hidden">
+            <h2>Auction Live</h2>
+            <div class="current-player-display">
+                <div class="player-photo-container">
+                    <img id="player-photo" src="placeholder.jpg" alt="Player Photo">
+                </div>
+                <div class="player-info">
+                    <h3 id="player-name">Player Name</h3>
+                    <p>Base Price: ₹<span id="base-price">0</span> Cr</p>
+                    <p>Role: <span id="player-role"></span></p>
+                    <p>Nationality: <span id="player-nationality"></span></p>
+                </div>
+            </div>
+
+            <div class="bidding-area">
+                <p>Current Bid: ₹<span id="current-highest-bid">0</span> Cr (<span id="highest-bidder-team">No bids
+                        yet</span>)</p>
+                <p>Time Remaining: <span id="auction-timer">20</span>s</p>
+                <div class="bid-input-container">
+                    <!-- <input type="number" id="user-bid-input" placeholder="Enter your bid (in Cr)"> -->
+                    <button id="place-bid-btn">Place Bid</button>
+                    <!-- <button id="pass-bid-btn">Pass</button> -->
+                    <button id="skip-bid-btn">Skip</button>
+                </div>
+                <button id="auction-details-btn">Auction Details</button>
+            </div>
+        </div>
+
+        <hr>
+
+        <div id="auction-log-area" class="section hidden">
+            <h2>Auction Log</h2>
+            <ul id="auction-log">
+            </ul>
+        </div>
+
+        <div id="details-popup" class="details-popup hidden">
+            <div class="details-content">
+                <button class="close-btn">&times;</button>
+                <h2>Auction Details</h2>
+                <div class="details-options">
+                    <button id="player-list-btn">1. Player List</button>
+                    <button id="purse-remaining-btn">2. Purse Remaining of All Teams</button>
+                    <button id="current-squad-btn">3. Current Squad of All Teams</button>
+                </div>
+
+                <div id="details-view" class="hidden">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>
