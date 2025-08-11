@@ -35,6 +35,7 @@ const AUCTION_TIME_PER_PLAYER = 20; // Seconds mein
 let isAuctionPaused = false; // Auction pause karne ke liye jab details popup khula ho.
 let aiBidTimeoutId = null; // AI bidding timeout ko store karne ke liye
 let teamsCurrentlyBidding = new Set(); // Ye track karega kaun si teams abhi active bid kar sakti hain
+let auctionLog = []; // Local Storage ke liye auction log save karenge.
 
 // --- DOM Elements ---
 // HTML ke elements ko pakadne ke liye, taaki unhe JavaScript se control kar saken.
@@ -62,6 +63,7 @@ const playerListBtn = document.getElementById('player-list-btn');
 const purseRemainingBtn = document.getElementById('purse-remaining-btn');
 const currentSquadBtn = document.getElementById('current-squad-btn');
 const detailsView = document.getElementById('details-view');
+const clearSavedGameBtn = document.getElementById('clear-saved-game-btn'); // Naya button
 
 // --- Helper Functions (NEWLY ADDED / VERIFIED) ---
 function isOverseasPlayer(player) {
@@ -751,23 +753,118 @@ function initializeGameData() {
     availablePlayers = [];
 }
 
+
+
+
+
+
+
+
+
+
+// --- LOCAL STORAGE LOGIC ---
+// Game state ko local storage mein save karo.
+function saveGameState() {
+    const gameState = {
+        TEAMS: TEAMS,
+        availablePlayers: availablePlayers,
+        currentAuctionPlayer: currentAuctionPlayer,
+        currentHighestBid: currentHighestBid,
+        highestBidderTeamId: highestBidderTeamId,
+        previousHighestBid: previousHighestBid,
+        previousHighestBidderTeamId: previousHighestBidderTeamId,
+        userSelectedTeamId: userSelectedTeamId,
+        auctionLog: auctionLog
+    };
+    localStorage.setItem('iplAuctionGameState', JSON.stringify(gameState));
+    console.log('Game state saved to local storage.');
+}
+
+// Local storage se game state load karo.
+function loadGameState() {
+    const savedState = localStorage.getItem('iplAuctionGameState');
+    if (savedState) {
+        const gameState = JSON.parse(savedState);
+
+        // Saved data ko restore karo
+        TEAMS.forEach(team => {
+            const savedTeam = gameState.TEAMS.find(t => t.id === team.id);
+            if (savedTeam) {
+                team.purse = savedTeam.purse;
+                team.squad = savedTeam.squad;
+                team.retainedPlayers = savedTeam.retainedPlayers;
+            }
+        });
+
+        availablePlayers = gameState.availablePlayers;
+        currentAuctionPlayer = gameState.currentAuctionPlayer;
+        currentHighestBid = gameState.currentHighestBid;
+        highestBidderTeamId = gameState.highestBidderTeamId;
+        previousHighestBid = gameState.previousHighestBid;
+        previousHighestBidderTeamId = gameState.previousHighestBidderTeamId;
+        userSelectedTeamId = gameState.userSelectedTeamId;
+        auctionLog = gameState.auctionLog;
+
+        // UI ko updated state ke hisaab se dikhao
+        document.getElementById('team-selection-area').classList.add('hidden');
+        auctionBoard.classList.remove('hidden');
+        document.getElementById('auction-log-area').classList.remove('hidden');
+
+        // Auction log ko render karo
+        auctionLogList.innerHTML = ''; // Pehle ka log clear karo
+        auctionLog.forEach(logEntry => {
+            const listItem = document.createElement('li');
+            listItem.textContent = logEntry.message;
+            if (logEntry.className) {
+                listItem.classList.add(logEntry.className);
+            }
+            auctionLogList.prepend(listItem);
+        });
+
+        if (currentAuctionPlayer) {
+            updateAuctionBoard();
+            startTimer();
+        } else {
+            // Agar saare players auction ho chuke hain, to endAuction call karo
+            if (availablePlayers.length === 0) {
+                endAuction();
+            } else {
+                // Agar current player nahi hai, to next auction shuru karo
+                startAuction();
+            }
+        }
+
+        console.log('Game state loaded successfully!');
+        alert('Saved game loaded successfully!');
+        return true; // Game load ho gaya
+    }
+    return false; // Koi saved game nahi mila
+}
+
+// Saved game ko clear karne ke liye
+function clearSavedGame() {
+    localStorage.removeItem('iplAuctionGameState');
+    window.location.reload(); // Page ko reload karo taaki game reset ho jaye
+}
+// --- LOCAL STORAGE LOGIC ENDS ---
+
+
 // --- UI Initialization ---
-// Team selection buttons ko dikhao.
 function renderTeamSelection() {
-    teamButtonsContainer.innerHTML = ''; // Pehle content clear karo
+    teamButtonsContainer.innerHTML = '';
     TEAMS.forEach(team => {
         const button = document.createElement('button');
         button.classList.add('team-btn');
         button.textContent = team.name;
         button.dataset.teamId = team.id;
         button.addEventListener('click', () => selectUserTeam(team.id));
-        teamButtonsContainer.appendChild(button); // Button ko container mein add karo
+        teamButtonsContainer.appendChild(button);
     });
 }
 
-// Jab user team select kare.
 function selectUserTeam(teamId) {
     userSelectedTeamId = teamId;
+    // ... (rest of the selectUserTeam function is unchanged) ...
     document.querySelectorAll('.team-btn').forEach(btn => {
         btn.classList.remove('selected');
         if (btn.dataset.teamId === teamId) {
@@ -777,11 +874,10 @@ function selectUserTeam(teamId) {
 
     const userTeam = TEAMS.find(t => t.id === userSelectedTeamId);
     selectedTeamNameSpan.textContent = userTeam.name;
-    renderRetentionList(userTeam.squad2024); // Sirf user ki team ka 2024 squad dikhao.
+    renderRetentionList(userTeam.squad2024);
     userTeamDetailsSection.classList.remove('hidden');
 }
 
-// Retention list ko dikhao.
 function renderRetentionList(squad2024) {
     retentionListDiv.innerHTML = '';
     squad2024.sort((a, b) => a.name.localeCompare(b.name)).forEach(player => {
@@ -798,7 +894,6 @@ function renderRetentionList(squad2024) {
 }
 
 // --- Retention Logic ---
-// Jab user retention confirm kare.
 confirmRetentionBtn.addEventListener('click', () => {
     const userTeam = TEAMS.find(t => t.id === userSelectedTeamId);
     const selectedCheckboxes = retentionListDiv.querySelectorAll('input[type="checkbox"]:checked');
@@ -810,40 +905,31 @@ confirmRetentionBtn.addEventListener('click', () => {
 
     userTeam.retainedPlayers = Array.from(selectedCheckboxes).map(checkbox => {
         const playerId = checkbox.dataset.playerId;
-        // allPlayersData se player ki full details nikalo.
         const playerDetails = allPlayersData[playerId];
-        // User ki team ke 2024 squad se player ki price nikalo.
         const player2024Price = userTeam.squad2024.find(p => p.id === playerId).price;
-        return { ...playerDetails, price: player2024Price }; // 2024 price ke saath add karo.
+        return { ...playerDetails, price: player2024Price };
     });
 
-    // Retained players ki price purse se minus kar do.
     userTeam.retainedPlayers.forEach(player => {
         userTeam.purse -= player.price;
     });
 
-    // Baaki teams ke liye players retain karo (AI ka kaam).
     retainPlayersForOtherTeams();
-
-    // Ab auction ke liye players ki final list banao.
     determineAuctionPool();
 
-    // alert(`${userTeam.retainedPlayers.length} players retain ho gaye ${userTeam.name} ke liye. Ab auction shuru hoga!`);
-    alert(`${userTeam.retainedPlayers.length} players retain by ${userTeam.name}. Now the auction will start!`);
+    alert(`${userTeam.retainedPlayers.length} players retain ho gaye ${userTeam.name} ke liye. Ab auction shuru hoga!`);
     document.getElementById('team-selection-area').classList.add('hidden');
     auctionBoard.classList.remove('hidden');
     document.getElementById('auction-log-area').classList.remove('hidden');
 
+    saveGameState(); // Retention ke baad game state save karo
     startAuction();
 });
 
-// Baaki teams ke liye players retain karo.
 function retainPlayersForOtherTeams() {
     TEAMS.filter(team => team.id !== userSelectedTeamId).forEach(team => {
-        // Unke 2024 squad se players ko price ke hisaab se sort karo.
         const sortedSquad = team.squad2024.sort((a, b) => b.price - a.price);
 
-        // Randomly 2 se 5 players retain karo.
         const numToRetain = Math.floor(Math.random() * 4) + 2; // 2 se 5 players
         team.retainedPlayers = sortedSquad.slice(0, numToRetain);
 
@@ -854,117 +940,93 @@ function retainPlayersForOtherTeams() {
     });
 }
 
-// Auction ke liye final players ka pool determine karo.
 function determineAuctionPool() {
     const retainedPlayerIds = new Set();
-    const playersInAny2024Squad = new Set(); // Ye track karega kaun se players originally 2024 squads mein the.
+    const playersInAny2024Squad = new Set();
 
-    // Saari teams ke retain kiye gaye players ki IDs collect karo.
     TEAMS.forEach(team => {
         team.retainedPlayers.forEach(player => {
             retainedPlayerIds.add(player.id);
         });
-        // Saare players ki IDs bhi collect karo jo kisi bhi 2024 squad mein the.
         team.squad2024.forEach(player => {
             playersInAny2024Squad.add(player.id);
         });
     });
 
-    availablePlayers = []; // Auction pool ko reset karo.
+    availablePlayers = [];
 
-    // 1. Un players ko add karo jo originally kisi bhi 2024 squad mein nahi the (ye naye players hain).
     Object.values(allPlayersData).forEach(player => {
         if (!playersInAny2024Squad.has(player.id)) {
             availablePlayers.push(player);
         }
     });
 
-    // 2. Un players ko add karo jo 2024 squad mein the, lekin retain nahi kiye gaye.
     TEAMS.forEach(team => {
         team.squad2024.forEach(player => {
             if (!retainedPlayerIds.has(player.id)) {
-                // Agar player abhi tak availablePlayers mein nahi hai, toh add karo.
                 if (!availablePlayers.some(p => p.id === player.id)) {
-                    // Yahan original player details use karna auction ke liye sahi hai.
                     availablePlayers.push(allPlayersData[player.id]);
                 }
             }
         });
     });
 
-    // Players ko shuffle kar do auction order ke liye.
     availablePlayers.sort(() => 0.5 - Math.random());
-
     console.log(`Auction pool mein total players: ${availablePlayers.length}`);
 }
 
 
 // --- Auction Logic ---
 
-// Ye function next valid bid amount calculate karega
 function calculateNextBid(currentBid) {
     let nextBid = 0;
 
-    // Rule: Agar current bid 2.0 Cr se kam hai, toh 0.05 Cr (5 lakhs) se badhao
     if (currentBid < 2.0) {
-        nextBid = currentBid + 0.05; // 5 lakhs increment
+        nextBid = currentBid + 0.05;
+    } else {
+        nextBid = currentBid + 0.25;
     }
-    // Rule: Agar current bid 2.0 Cr ya usse zyada hai, toh 0.25 Cr (25 lakhs) se badhao
-    else {
-        nextBid = currentBid + 0.25; // 25 lakhs increment
-    }
-
-    // Ensure precise two decimal places for the result
     return parseFloat(nextBid.toFixed(2));
 }
 
-
-// Auction shuru karo ya next player ko bid ke liye lao.
 function startAuction() {
     if (availablePlayers.length === 0) {
-        endAuction(); // Agar koi player nahi bacha, toh auction khatam karo.
+        endAuction();
         return;
     }
-
-    // Har naye player ke liye AI bid timeout clear karo
     if (aiBidTimeoutId) {
         clearTimeout(aiBidTimeoutId);
         aiBidTimeoutId = null;
     }
 
-    // List se next player nikalo.
     currentAuctionPlayer = availablePlayers.shift();
 
-    currentHighestBid = currentAuctionPlayer.basePrice; // Bid base price se shuru hogi.
-    highestBidderTeamId = null; // Har naye player ke liye reset karo.
-    previousHighestBid = 0; // Reset previous bid info
-    previousHighestBidderTeamId = null; // Reset previous bidder info
+    currentHighestBid = currentAuctionPlayer.basePrice;
+    highestBidderTeamId = null;
+    previousHighestBid = 0;
+    previousHighestBidderTeamId = null;
 
-    // --- NEW / RE-ADDED LOGIC FOR ELIGIBLE BIDDERS START ---
-    teamsCurrentlyBidding.clear(); // Har naye player ke liye bidders ki list reset karo
+    teamsCurrentlyBidding.clear();
 
     TEAMS.forEach(team => {
         const currentTotalSquadSize = getTotalSquadSize(team);
         const currentOverseasCount = countOverseasPlayers(team);
         const isPlayerOverseas = isOverseasPlayer(currentAuctionPlayer);
 
-        // Check for squad size limit (max 25 players)
         if (currentTotalSquadSize >= 25) {
             console.log(`AI ${team.name}: Cannot bid for ${currentAuctionPlayer.name} (Squad size limit reached: ${currentTotalSquadSize}/25).`);
             logAuctionEvent(`${team.name} ne apni squad limit (${currentTotalSquadSize}/25) poori kar li hai, bid nahi kar sakta.`, 'warning-log-entry');
-            return; // Skip this team if squad is full
+            return;
         }
 
-        // Check for overseas player limit (max 8 overseas players) for an overseas player
         if (isPlayerOverseas && currentOverseasCount >= 8) {
             console.log(`AI ${team.name}: Cannot bid for ${currentAuctionPlayer.name} (Overseas limit reached: ${currentOverseasCount}/8).`);
             logAuctionEvent(`${team.name} ne apni overseas limit (${currentOverseasCount}/8) poori kar li hai, bid nahi kar sakta.`, 'warning-log-entry');
-            return; // Skip this team if overseas limit reached for an overseas player
+            return;
         }
 
-        // Finally, check if team has enough purse and add to eligible bidders
         if (team.purse >= currentAuctionPlayer.basePrice) {
-            teamsCurrentlyBidding.add(team.id); // Add team if eligible
+            teamsCurrentlyBidding.add(team.id);
         } else {
             console.log(`AI ${team.name}: Cannot bid for ${currentAuctionPlayer.name} (Not enough purse: ${team.purse.toFixed(2)} Cr, required: ${currentAuctionPlayer.basePrice.toFixed(2)} Cr).`);
             logAuctionEvent(`${team.name} ke paas ${currentAuctionPlayer.name} ke liye paisa nahi hai.`, 'warning-log-entry');
@@ -973,91 +1035,81 @@ function startAuction() {
 
     console.log(`Auction started for ${currentAuctionPlayer.name}. Initial bidders:`, Array.from(teamsCurrentlyBidding).map(id => TEAMS.find(t => t.id === id).name));
 
-    // If no teams are eligible to bid for this player, mark as unsold and move to next
     if (teamsCurrentlyBidding.size === 0) {
         logAuctionEvent(`${currentAuctionPlayer.name} par koi bhi team bid nahi kar sakti (purse, squad ya overseas limit ke karan). Unsold gaya. 😔`, 'unsold-log-entry');
         console.log(`WARNING: No teams are eligible to bid for ${currentAuctionPlayer.name}. Player will be unsold immediately.`);
-        setTimeout(startAuction, 2000); // Immediately move to next player
-        return; // Exit function, as auction for this player is resolved
+        // --- LOCAL STORAGE: UNSOLD hone par game state save karo ---
+        saveGameState();
+        setTimeout(startAuction, 2000);
+        return;
     }
-    // --- NEW / RE-ADDED LOGIC END ---
 
-    updateAuctionBoard(); // Auction board ko update karo.
-    startTimer(); // Timer shuru karo.
+    updateAuctionBoard();
+    startTimer();
 }
 
-// Auction board ko update karo.
 function updateAuctionBoard() {
     playerPhoto.src = currentAuctionPlayer.photo;
     playerName.textContent = currentAuctionPlayer.name;
-    basePriceSpan.textContent = currentAuctionPlayer.basePrice.toFixed(2); // toFixed(2)
+    basePriceSpan.textContent = currentAuctionPlayer.basePrice.toFixed(2);
     playerRoleSpan.textContent = currentAuctionPlayer.role;
     playerNationalitySpan.textContent = currentAuctionPlayer.nationality;
-    currentHighestBidSpan.textContent = currentHighestBid.toFixed(2); // Use toFixed(2) for consistency
-    // highestBidderTeamSpan.textContent = highestBidderTeamId ? TEAMS.find(t => t.id === highestBidderTeamId).name : 'Abhi koi bid nahi';
-    highestBidderTeamSpan.textContent = highestBidderTeamId ? TEAMS.find(t => t.id === highestBidderTeamId).name : 'Not bid yet';
+    currentHighestBidSpan.textContent = currentHighestBid.toFixed(2);
+    highestBidderTeamSpan.textContent = highestBidderTeamId ? TEAMS.find(t => t.id === highestBidderTeamId).name : 'Abhi koi bid nahi';
 }
 
-// Auction timer shuru karo.
 function startTimer() {
     let timeLeft = AUCTION_TIME_PER_PLAYER;
     auctionTimerSpan.textContent = timeLeft;
 
-    if (auctionTimer) clearInterval(auctionTimer); // Purana timer band karo, agar koi chal raha hai.
+    if (auctionTimer) clearInterval(auctionTimer);
 
     auctionTimer = setInterval(() => {
-        if (isAuctionPaused) return; // Agar pause hai toh kuch mat karo.
+        if (isAuctionPaused) return;
 
         timeLeft--;
         auctionTimerSpan.textContent = timeLeft;
 
         if (timeLeft <= 0) {
-            clearInterval(auctionTimer); // Time khatam, timer band!
-            if (aiBidTimeoutId) clearTimeout(aiBidTimeoutId); // AI ka pending bid bhi cancel karo
+            clearInterval(auctionTimer);
+            if (aiBidTimeoutId) clearTimeout(aiBidTimeoutId);
 
-            // Determine the winner or if unsold
             if (highestBidderTeamId) {
                 const winningTeam = TEAMS.find(t => t.id === highestBidderTeamId);
                 const currentTotalSquadSize = getTotalSquadSize(winningTeam);
                 const currentOverseasCount = countOverseasPlayers(winningTeam);
                 const isPlayerOverseas = isOverseasPlayer(currentAuctionPlayer);
 
-                // --- Squad Size Limit Check for Winning Team ---
                 if (currentTotalSquadSize >= 25) {
                     logAuctionEvent(`${currentAuctionPlayer.name} unsold gaya kyuki ${winningTeam.name} ne apni squad limit (${currentTotalSquadSize}/25) poori kar li thi. 😔`, 'unsold-log-entry');
                 }
-                // --- Overseas Player Limit Check for Winning Team ---
                 else if (isPlayerOverseas && currentOverseasCount >= 8) {
                     logAuctionEvent(`${currentAuctionPlayer.name} unsold gaya kyuki ${winningTeam.name} ne overseas limit (${currentOverseasCount}/8) poori kar li thi. 😔`, 'unsold-log-entry');
                 }
                 else {
                     winningTeam.squad.push({ ...currentAuctionPlayer, price: currentHighestBid });
                     winningTeam.purse -= currentHighestBid;
-                    // logAuctionEvent(`${currentAuctionPlayer.name} ko ${winningTeam.name} ne ₹${currentHighestBid.toFixed(2)} Cr mein kharida! 🎉`, 'sold-log-entry');
-                    logAuctionEvent(`${currentAuctionPlayer.name} bought by ${winningTeam.name} for ₹${currentHighestBid.toFixed(2)} Cr! 🎉`, 'sold-log-entry');
+                    logAuctionEvent(`${currentAuctionPlayer.name} ko ${winningTeam.name} ne ₹${currentHighestBid.toFixed(2)} Cr mein kharida! 🎉`, 'sold-log-entry');
                     console.log(`${winningTeam.name} ka bacha hua purse: ${winningTeam.purse.toFixed(2)} Cr`);
                 }
             } else {
-                // logAuctionEvent(`${currentAuctionPlayer.name} unsold gaya. 😔`, 'unsold-log-entry');
-                logAuctionEvent(`${currentAuctionPlayer.name} went unsold. 😔`, 'unsold-log-entry');
+                logAuctionEvent(`${currentAuctionPlayer.name} unsold gaya. 😔`, 'unsold-log-entry');
             }
-            setTimeout(startAuction, 2000); // 2 second baad next player lao.
+            // --- LOCAL STORAGE: Player sold/unsold hone par game state save karo ---
+            saveGameState();
+            setTimeout(startAuction, 2000);
         }
-        // AI ko bid karne ka mauka do
         else {
-            // Agar user highest bidder hai aur time abhi kaafi hai, AI ko bid karne ke liye force karo
             if (highestBidderTeamId === userSelectedTeamId && timeLeft > 5) {
                 if (!aiBidTimeoutId) {
-                    aiBidTimeoutId = setTimeout(simulateAIBids, 500 + Math.random() * 500); // AI bids quickly
+                    aiBidTimeoutId = setTimeout(simulateAIBids, 500 + Math.random() * 500);
                 }
             }
-            // Agar koi highest bidder nahi hai (naya player aaya hai)
-            else if (!highestBidderTeamId && timeLeft > 10) { // Give AI more time initially to bid
+            else if (!highestBidderTeamId && timeLeft > 10) {
                 if (!aiBidTimeoutId) {
-                    aiBidTimeoutId = setTimeout(simulateAIBids, 1000 + Math.random() * 1000); // Thoda jyada delay shuru mein
+                    aiBidTimeoutId = setTimeout(simulateAIBids, 1000 + Math.random() * 1000);
                 }
             }
-            // General AI bidding: every few seconds if it's not the user's turn
             else if (highestBidderTeamId !== userSelectedTeamId && timeLeft % 5 === 0 && timeLeft > 2) {
                 if (!aiBidTimeoutId) {
                     aiBidTimeoutId = setTimeout(simulateAIBids, 500 + Math.random() * 1000);
@@ -1066,15 +1118,13 @@ function startTimer() {
         }
     }, 1000);
 
-    // Initial AI bid ke liye: Jab naya player aata hai aur koi bid nahi hai, AI ko mauka do.
     if (!highestBidderTeamId) {
-        if (aiBidTimeoutId) clearTimeout(aiBidTimeoutId); // Clear previous if any
-        aiBidTimeoutId = setTimeout(simulateAIBids, 1500 + Math.random() * 1000); // Thoda jyada delay shuru mein
+        if (aiBidTimeoutId) clearTimeout(aiBidTimeoutId);
+        aiBidTimeoutId = setTimeout(simulateAIBids, 1500 + Math.random() * 1000);
     }
 }
 
 
-// User Bidding
 placeBidBtn.addEventListener('click', () => {
     const userNextBid = calculateNextBid(currentHighestBid);
     const userTeam = TEAMS.find(t => t.id === userSelectedTeamId);
@@ -1082,49 +1132,42 @@ placeBidBtn.addEventListener('click', () => {
     const currentUserOverseasCount = countOverseasPlayers(userTeam);
     const currentUserSquadSize = getTotalSquadSize(userTeam);
 
-    // --- Squad Size Limit Check for User ---
     if (currentUserSquadSize >= 25) {
         alert(`Boss, aapke paas already 25 players hain. Ab aap aur koi player nahi khareed sakte!`);
         logAuctionEvent(`${userTeam.name} ki squad size limit (${currentUserSquadSize}/25) poori ho gayi hai, bid nahi kar sakta.`, 'warning-log-entry');
-        teamsCurrentlyBidding.delete(userSelectedTeamId); // User is out for this player
-        // If user was highest bidder and now hit limit, they withdraw
+        teamsCurrentlyBidding.delete(userSelectedTeamId);
         if (highestBidderTeamId === userSelectedTeamId) {
             logAuctionEvent(`${userTeam.name} ne apni bid wapas le li kyuki squad limit poori ho gayi.`, 'withdraw-log-entry');
             highestBidderTeamId = previousHighestBidderTeamId;
             currentHighestBid = previousHighestBid;
             updateAuctionBoard();
         }
-        // After user is out, give AIs a chance to react
         if (auctionTimer) clearInterval(auctionTimer);
         if (aiBidTimeoutId) clearTimeout(aiBidTimeoutId);
-        startTimer(); // Restart timer
-        simulateAIBids(); // Immediately check for AI bids
-        return; // Stop further execution
+        startTimer();
+        simulateAIBids();
+        return;
     }
 
-    // --- Overseas Player Limit Check for User ---
     if (isPlayerOverseas && currentUserOverseasCount >= 8) {
         alert(`Boss, aapke paas already 8 overseas players hain. Ab aap aur koi overseas player nahi khareed sakte!`);
         logAuctionEvent(`${userTeam.name} overseas player limit (${currentUserOverseasCount}/8) tak pahunch gaya hai, bid nahi kar sakta.`, 'warning-log-entry');
-        teamsCurrentlyBidding.delete(userSelectedTeamId); // User is out for this player
-        // If user was highest bidder and now hit limit, they withdraw
+        teamsCurrentlyBidding.delete(userSelectedTeamId);
         if (highestBidderTeamId === userSelectedTeamId) {
             logAuctionEvent(`${userTeam.name} ne apni bid wapas le li kyuki overseas limit poori ho gayi.`, 'withdraw-log-entry');
             highestBidderTeamId = previousHighestBidderTeamId;
             currentHighestBid = previousHighestBid;
             updateAuctionBoard();
         }
-        // After user is out, give AIs a chance to react
         if (auctionTimer) clearInterval(auctionTimer);
         if (aiBidTimeoutId) clearTimeout(aiBidTimeoutId);
-        startTimer(); // Restart timer
-        simulateAIBids(); // Immediately check for AI bids
-        return; // Stop further execution
+        startTimer();
+        simulateAIBids();
+        return;
     }
 
     if (userNextBid > userTeam.purse) {
         alert(`Itna paisa nahi hai tere paas! Bacha hua purse: ₹${userTeam.purse.toFixed(2)} Cr. Bid ₹${userNextBid.toFixed(2)} Cr chahiye.`);
-        // User cannot bid due to purse, they are out for this player
         teamsCurrentlyBidding.delete(userSelectedTeamId);
         if (highestBidderTeamId === userSelectedTeamId) {
             logAuctionEvent(`${userTeam.name} ne apni bid wapas le li kyuki paisa nahi hai.`, 'withdraw-log-entry');
@@ -1139,42 +1182,36 @@ placeBidBtn.addEventListener('click', () => {
         return;
     }
 
-    // Clear any pending AI bid when user bids
     if (aiBidTimeoutId) {
         clearTimeout(aiBidTimeoutId);
         aiBidTimeoutId = null;
     }
 
-    // User is added to teamsCurrentlyBidding if they successfully bid
-    teamsCurrentlyBidding.add(userSelectedTeamId); // Make sure user is still considered an active bidder
-
+    teamsCurrentlyBidding.add(userSelectedTeamId);
     handleBid(userSelectedTeamId, userNextBid);
-});
 
-// --- Renamed from passBidBtn to skipBidBtn and modified logic ---
+    // --- LOCAL STORAGE: User bid karne par game state save karo ---
+    saveGameState();
+});
 
 skipBidBtn.addEventListener('click', () => {
     const userTeam = TEAMS.find(t => t.id === userSelectedTeamId);
 
-    // Stop timer and clear any pending AI bids immediately
     if (auctionTimer) clearInterval(auctionTimer);
     if (aiBidTimeoutId) {
         clearTimeout(aiBidTimeoutId);
         aiBidTimeoutId = null;
     }
 
-    // Determine the actual winning team after the skip
     let finalWinningTeamId = null;
     let finalWinningBid = 0;
 
     if (highestBidderTeamId === userSelectedTeamId) {
-        // User was highest bidder, but skipped, so previous highest bidder wins (if any)
         if (previousHighestBidderTeamId) {
             finalWinningTeamId = previousHighestBidderTeamId;
             finalWinningBid = previousHighestBid;
         }
     } else {
-        // User was not highest bidder, so current highest bidder wins (if any)
         if (highestBidderTeamId) {
             finalWinningTeamId = highestBidderTeamId;
             finalWinningBid = currentHighestBid;
@@ -1187,133 +1224,99 @@ skipBidBtn.addEventListener('click', () => {
         const currentOverseasCount = countOverseasPlayers(winningTeam);
         const isPlayerOverseas = isOverseasPlayer(currentAuctionPlayer);
 
-        // --- Squad Size Limit Check for Winning Team ---
         if (currentTotalSquadSize >= 25) {
-            // logAuctionEvent(`${userTeam.name} ne skip kiya. ${currentAuctionPlayer.name} unsold gaya kyuki ${winningTeam.name} ne apni squad limit (${currentTotalSquadSize}/25) poori kar li thi. 😔`, 'unsold-log-entry');
-            logAuctionEvent(`${userTeam.name} skipped. ${currentAuctionPlayer.name} unsold gaya kyuki ${winningTeam.name} ne apni squad limit (${currentTotalSquadSize}/25) poori kar li thi. 😔`, 'unsold-log-entry');
+            logAuctionEvent(`${userTeam.name} ne skip kiya. ${currentAuctionPlayer.name} unsold gaya kyuki ${winningTeam.name} ne apni squad limit (${currentTotalSquadSize}/25) poori kar li thi. 😔`, 'unsold-log-entry');
         }
-        // --- Overseas Player Limit Check for Winning Team ---
         else if (isPlayerOverseas && currentOverseasCount >= 8) {
-            // logAuctionEvent(`${userTeam.name} ne skip kiya. ${currentAuctionPlayer.name} unsold gaya kyuki ${winningTeam.name} ne overseas limit (${currentOverseasCount}/8) poori kar li thi. 😔`, 'unsold-log-entry');
-            logAuctionEvent(`${userTeam.name} skipped. ${currentAuctionPlayer.name} unsold gaya kyuki ${winningTeam.name} ne overseas limit (${currentOverseasCount}/8) poori kar li thi. 😔`, 'unsold-log-entry');
+            logAuctionEvent(`${userTeam.name} ne skip kiya. ${currentAuctionPlayer.name} unsold gaya kyuki ${winningTeam.name} ne overseas limit (${currentOverseasCount}/8) poori kar li thi. 😔`, 'unsold-log-entry');
         }
         else {
-            // Player can be added
             winningTeam.squad.push({ ...currentAuctionPlayer, price: finalWinningBid });
             winningTeam.purse -= finalWinningBid;
-            // logAuctionEvent(`${userTeam.name} ne skip kiya. ${currentAuctionPlayer.name} ko ${winningTeam.name} ne ₹${finalWinningBid.toFixed(2)} Cr mein kharida! 🎉`, 'sold-log-entry');
-            logAuctionEvent(`${userTeam.name} skipped. ${currentAuctionPlayer.name} bought by ${winningTeam.name} for ₹${finalWinningBid.toFixed(2)} Cr! 🎉`, 'sold-log-entry');
+            logAuctionEvent(`${userTeam.name} ne skip kiya. ${currentAuctionPlayer.name} ko ${winningTeam.name} ne ₹${finalWinningBid.toFixed(2)} Cr mein kharida! 🎉`, 'sold-log-entry');
             console.log(`${winningTeam.name} ka bacha hua purse: ${winningTeam.purse.toFixed(2)} Cr`);
         }
     } else {
-        // If no one was highest bidder, player goes unsold
-        // logAuctionEvent(`${userTeam.name} ne skip kiya. ${currentAuctionPlayer.name} unsold gaya. 😔`, 'unsold-log-entry');
-        logAuctionEvent(`${userTeam.name} skipped. ${currentAuctionPlayer.name} went unsold. 😔`, 'unsold-log-entry');
+        logAuctionEvent(`${userTeam.name} ne skip kiya. ${currentAuctionPlayer.name} unsold gaya. 😔`, 'unsold-log-entry');
     }
-    // Immediately move to the next player after skip/sale
-    setTimeout(startAuction, 2000); // 2 second delay before next player
+    // --- LOCAL STORAGE: Skip karne par bhi game state save karo ---
+    saveGameState();
+    setTimeout(startAuction, 2000);
 });
 
-
-// AI Bidding Logic
 function simulateAIBids() {
-    if (isAuctionPaused) return; // Agar pause hai toh kuch mat karo.
-    if (aiBidTimeoutId) { // Clear the currently scheduled AI bid before scheduling a new one
+    if (isAuctionPaused) return;
+    if (aiBidTimeoutId) {
         clearTimeout(aiBidTimeoutId);
         aiBidTimeoutId = null;
     }
 
     const potentialAIBidders = TEAMS.filter(team => {
-        // AI should not bid if it's the highest bidder or user is the highest bidder
         if (team.id === highestBidderTeamId || team.id === userSelectedTeamId) return false;
 
         const currentTotalSquadSize = getTotalSquadSize(team);
         const currentOverseasCount = countOverseasPlayers(team);
         const isPlayerOverseas = isOverseasPlayer(currentAuctionPlayer);
 
-        // Check for squad size limit (max 25 players)
-        if (currentTotalSquadSize >= 25) {
-            // console.log(`AI ${team.name}: Not bidding (Squad size limit reached).`);
-            return false;
-        }
+        if (currentTotalSquadSize >= 25) return false;
+        if (isPlayerOverseas && currentOverseasCount >= 8) return false;
 
-        // Check for overseas player limit (max 8 overseas players for an overseas player)
-        if (isPlayerOverseas && currentOverseasCount >= 8) {
-            // console.log(`AI ${team.name}: Not bidding (Overseas limit reached).`);
-            return false;
-        }
-
-        // Check if team has enough purse for the next bid increment
         const aiNextBid = calculateNextBid(currentHighestBid);
-        if (team.purse < aiNextBid) {
-            // console.log(`AI ${team.name}: Not bidding (Not enough purse).`);
-            return false;
-        }
-        return true; // Eligible to bid
+        if (team.purse < aiNextBid) return false;
+        return true;
     });
 
     if (potentialAIBidders.length === 0) {
-        return; // Koi AI bid nahi kar sakta.
+        return;
     }
 
-    potentialAIBidders.sort(() => 0.5 - Math.random()); // Randomize AI bid order
+    potentialAIBidders.sort(() => 0.5 - Math.random());
 
     for (const team of potentialAIBidders) {
+        if (team.id === highestBidderTeamId) continue;
+
         let aiNextBid = calculateNextBid(currentHighestBid);
 
-        // AI Strategy Refinement:
-        // 1. Value based bidding: AIs will have an internal max bid for a player.
-        //    This prevents them from infinitely bidding for a player they don't value highly.
         const baseValue = currentAuctionPlayer.basePrice;
-        let aiMaxBidMultiplier = 2.5 + Math.random() * 2.5; // AI can bid up to 2.5 to 5 times base price
+        let aiMaxBidMultiplier = 2.5 + Math.random() * 2.5;
         if (currentAuctionPlayer.role === 'ALL-ROUNDER' || currentAuctionPlayer.basePrice >= 2.0) {
-            aiMaxBidMultiplier += 1.0; // More aggressive for high-value players or all-rounders
+            aiMaxBidMultiplier += 1.0;
         }
         const aiCalculatedMaxBid = parseFloat((baseValue * aiMaxBidMultiplier).toFixed(2));
 
-        // 2. Purse management: AIs also consider their remaining purse.
-        //    They won't go broke for a single player unless he's a top priority.
         const remainingPursePercentage = team.purse / team.budget;
-        let purseWillingness = 0.1 + Math.random() * 0.2; // Willing to spend 10-30% of remaining budget
-        if (remainingPursePercentage < 0.3) { // If low on purse, reduce willingness
+        let purseWillingness = 0.1 + Math.random() * 0.2;
+        if (remainingPursePercentage < 0.3) {
             purseWillingness = 0.05 + Math.random() * 0.1;
         }
         const aiPurseLimit = team.purse;
 
-        // The AI's *target* bid for this turn is the next valid increment.
         let potentialBid = aiNextBid;
 
-        // Ensure the potentialBid does not exceed AI's calculated max value for this player.
-        // If it does, the AI will not bid higher than its calculated max.
         if (potentialBid > aiCalculatedMaxBid) {
-            continue; // This AI won't bid this time, as the next increment is too high for its value assessment.
+            continue;
         }
-
-        // Ensure the potentialBid does not exceed the AI's purse.
         if (potentialBid > aiPurseLimit) {
-            continue; // This AI cannot afford the next increment.
+            continue;
         }
 
-        // If all checks pass, the AI places the next valid increment.
         let finalAIBid = potentialBid;
-        finalAIBid = parseFloat(finalAIBid.toFixed(2)); // Ensure proper rounding
+        finalAIBid = parseFloat(finalAIBid.toFixed(2));
 
         if (finalAIBid > currentHighestBid && finalAIBid <= team.purse) {
             handleBid(team.id, finalAIBid);
-            // After an AI bids, schedule the next potential AI bid with a slight delay
-            // This prevents all AIs from bidding at once, making it more natural.
-            aiBidTimeoutId = setTimeout(simulateAIBids, 800 + Math.random() * 1200); // 0.8 to 2 seconds delay for next AI bid
-            return; // Only one AI bids per call
+            // --- LOCAL STORAGE: AI bid karne par game state save karo ---
+            saveGameState();
+            aiBidTimeoutId = setTimeout(simulateAIBids, 800 + Math.random() * 1200);
+            return;
         }
     }
 }
 
 
-// Bid ko handle karo.
 function handleBid(teamId, bidAmount) {
-    bidAmount = parseFloat(bidAmount.toFixed(2)); // Ensure bidAmount is float with 2 decimal places
+    bidAmount = parseFloat(bidAmount.toFixed(2));
 
-    // Store current highest bid details as previous before updating
     previousHighestBid = currentHighestBid;
     previousHighestBidderTeamId = highestBidderTeamId;
 
@@ -1321,28 +1324,22 @@ function handleBid(teamId, bidAmount) {
         currentHighestBid = bidAmount;
         highestBidderTeamId = teamId;
         updateAuctionBoard();
-        // logAuctionEvent(`${TEAMS.find(t => t.id === teamId).name} ne bid ki ₹${bidAmount.toFixed(2)} Cr.`);
-        logAuctionEvent(`${TEAMS.find(t => t.id === teamId).name} bid at ₹${bidAmount.toFixed(2)} Cr.`);
+        logAuctionEvent(`${TEAMS.find(t => t.id === teamId).name} ne bid ki ₹${bidAmount.toFixed(2)} Cr.`);
 
-        // Jab bhi nayi bid lagti hai, purana timer aur pending AI bid ko clear karo aur naya timer shuru karo.
         if (auctionTimer) clearInterval(auctionTimer);
         if (aiBidTimeoutId) {
-            clearTimeout(aiBidTimeoutId); // Clear any pending AI bid
-            aiBidTimeoutId = null; // Reset the timeout ID
+            clearTimeout(aiBidTimeoutId);
+            aiBidTimeoutId = null;
         }
 
-        // If the user just made the highest bid, schedule a potential AI counter-bid quickly
         if (teamId === userSelectedTeamId) {
-            aiBidTimeoutId = setTimeout(simulateAIBids, 700 + Math.random() * 800); // AI reacts faster to user's bid
+            aiBidTimeoutId = setTimeout(simulateAIBids, 700 + Math.random() * 800);
         } else {
-            // If AI just bid, let the timer run for a bit before considering next AI bid
-            // The startTimer will handle scheduling the next AI if needed
         }
-        startTimer(); // Naya timer shuru karo.
+        startTimer();
     }
 }
 
-// Auction ke events ko log mein add karo.
 function logAuctionEvent(message, className = '') {
     const listItem = document.createElement('li');
     listItem.textContent = message;
@@ -1350,50 +1347,50 @@ function logAuctionEvent(message, className = '') {
         listItem.classList.add(className);
     }
     auctionLogList.prepend(listItem);
-    // Keep only last 50 log entries to prevent excessive DOM elements
     if (auctionLogList.children.length > 50) {
         auctionLogList.removeChild(auctionLogList.lastChild);
     }
+    // --- LOCAL STORAGE: Log ko bhi save karo ---
+    auctionLog.unshift({ message: message, className: className });
+    if (auctionLog.length > 50) {
+        auctionLog.pop();
+    }
 }
 
-// Auction khatam karo.
 function endAuction() {
     clearInterval(auctionTimer);
     if (aiBidTimeoutId) clearTimeout(aiBidTimeoutId);
     alert('Auction Khatam! Final squads dekh lo.');
-    showCurrentSquads(); // Saari teams ke squads dikhao.
+    // --- LOCAL STORAGE: Auction khatam hone par game state clear karo ---
+    localStorage.removeItem('iplAuctionGameState');
+    showCurrentSquads();
     detailsPopup.classList.remove('hidden');
 }
 
 // --- Auction Details Pop-up Logic ---
-// Details popup kholo.
 auctionDetailsBtn.addEventListener('click', () => {
     isAuctionPaused = true;
-    if (auctionTimer) clearInterval(auctionTimer); // Timer pause
-    if (aiBidTimeoutId) clearTimeout(aiBidTimeoutId); // AI bid pause
+    if (auctionTimer) clearInterval(auctionTimer);
+    if (aiBidTimeoutId) clearTimeout(aiBidTimeoutId);
     detailsPopup.classList.remove('hidden');
 });
 
-// Details popup band karo.
 closeDetailsBtn.addEventListener('click', () => {
     isAuctionPaused = false;
     detailsPopup.classList.add('hidden');
-    // Resume timer only if an auction player is active
     if (currentAuctionPlayer) {
-        startTimer(); // Timer resume
+        startTimer();
     }
 });
 
-// Buttons click hone par kya hoga.
 playerListBtn.addEventListener('click', showPlayerList);
 purseRemainingBtn.addEventListener('click', showPurseRemaining);
 currentSquadBtn.addEventListener('click', showCurrentSquads);
+clearSavedGameBtn.addEventListener('click', clearSavedGame);
 
-
-// Player list dikhao.
 function showPlayerList() {
     detailsView.innerHTML = `
-        <h3>Players remaining in the auction (yet unauctioned)</h3>
+        <h3>Auction mein bache hue players (abhi tak unauctioned)</h3>
         <table>
             <thead>
                 <tr>
@@ -1409,7 +1406,6 @@ function showPlayerList() {
     `;
     const tbody = document.getElementById('player-list-table-body');
 
-    // Woh players jo abhi tak kisi squad (retained ya auction se kharida hua) mein nahi hain.
     const currentAuctionPoolDisplay = [];
     const acquiredPlayerIds = new Set();
 
@@ -1437,17 +1433,16 @@ function showPlayerList() {
     detailsView.classList.remove('hidden');
 }
 
-// Teams ka purse remaining dikhao.
 function showPurseRemaining() {
     detailsView.innerHTML = `
-        <h3>All teams' remaining wallets</h3>
+        <h3>Saari Teams ka bacha hua Purse</h3>
         <table>
             <thead>
                 <tr>
                     <th>Team</th>
                     <th>Budget (Cr)</th>
-                    <th>Spent (Cr)</th>
-                    <th>Remaining (Cr)</th>
+                    <th>Kharch (Cr)</th>
+                    <th>Bacha hua (Cr)</th>
                     <th>Squad Size</th>
                     <th>Overseas Players</th>
                 </tr>
@@ -1459,7 +1454,7 @@ function showPurseRemaining() {
     const tbody = document.getElementById('purse-remaining-table-body');
     TEAMS.forEach(team => {
         const totalSquadSize = getTotalSquadSize(team);
-        const overseasCount = countOverseasPlayers(team); // New: Overseas count
+        const overseasCount = countOverseasPlayers(team);
         const spent = team.budget - team.purse;
         const tr = document.createElement('tr');
         tr.innerHTML = `
@@ -1475,19 +1470,15 @@ function showPurseRemaining() {
     detailsView.classList.remove('hidden');
 }
 
-// Current squad of all teams dikhao.
 function showCurrentSquads() {
-    detailsView.innerHTML = `<h3>Current squad of all teams</h3>`;
+    detailsView.innerHTML = `<h3>Saari Teams ke Current Squads</h3>`;
     TEAMS.forEach(team => {
         const teamSquadDiv = document.createElement('div');
         teamSquadDiv.classList.add('team-squad-section');
-        // New: Display Squad Size and Overseas Players in header
         teamSquadDiv.innerHTML = `<h3>${team.name} Squad (Purse: ₹${team.purse.toFixed(2)} Cr | Total Players: ${getTotalSquadSize(team)} | Overseas: ${countOverseasPlayers(team)})</h3>`;
 
-        // Retained aur auctioned players ko combine karo.
         const fullSquad = [...team.retainedPlayers, ...team.squad];
 
-        // Players ko role ke hisaab se group karo.
         const roles = ['BATSMAN', 'ALL-ROUNDER', 'WICKET-KEEPER', 'SPINNER', 'PACER'];
         const groupedSquad = {};
         roles.forEach(role => groupedSquad[role] = []);
@@ -1506,7 +1497,7 @@ function showCurrentSquads() {
                 ul.classList.add('squad-player-list');
                 playersInRole.sort((a, b) => b.price - a.price).forEach(player => {
                     const status = team.retainedPlayers.some(rp => rp.id === player.id) ? '(Retained)' : '';
-                    const nationalityStatus = isOverseasPlayer(player) ? '(Overseas)' : '(Indian)'; // New: Nationality status
+                    const nationalityStatus = isOverseasPlayer(player) ? '(Overseas)' : '(Indian)';
                     const li = document.createElement('li');
                     li.textContent = `${player.name} - ₹${player.price.toFixed(2)} Cr ${status} ${nationalityStatus}`;
                     ul.appendChild(li);
@@ -1522,8 +1513,11 @@ function showCurrentSquads() {
 
 
 // --- Initialize the game on page load ---
-// Jab page load ho jaye, tab game shuru karo.
 document.addEventListener('DOMContentLoaded', () => {
-    initializeGameData(); // Pehle saara data set karo.
-    renderTeamSelection(); // Fir team select karne ke options dikhao.
+    initializeGameData();
+    // --- LOCAL STORAGE: Page load hone par pehle saved game ko load karne ki koshish karo ---
+    if (!loadGameState()) {
+        // Agar koi saved game nahi mila, toh naya game shuru karo
+        renderTeamSelection();
+    }
 });
