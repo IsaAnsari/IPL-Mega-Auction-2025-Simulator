@@ -550,7 +550,7 @@ function initializeGameData() {
         { id: 'new_hazlewood', name: 'Josh Hazlewood', role: 'PACER', nationality: 'Australia', basePrice: 2, photo: 'https://d1k8sn41pix00a.cloudfront.net/media/players/photos/Josh_Hazlewood.png' },
         { id: 'new_jamieson', name: 'Kyle Jamieson', role: 'PACER', nationality: 'New Zealand', basePrice: 1.0, photo: 'https://media.cricclubs.com/documentsRep/profilePics/24d9a19a-ab6b-4ca5-a3b7-c3ff86f91dd6.png' },
         { id: 'new_archer', name: 'Jofra Archer', role: 'PACER', nationality: 'England', basePrice: 2.0, photo: 'https://roarmarathi.com/wp-content/uploads/2023/11/181.png' },
-        { id: 'new_jordan', name: 'Chris Jordan', role: 'PACER', nationality: 'England', basePrice: 1.2, photo: 'https://www.mumbaiindians.com/static-assets/images/players/large/action-shots/26718.png?v=5.64&w=400' },
+        { id: 'new_jordan', name: 'Chris Jordan', role: 'PACER', nationality: 'England', basePrice: 1.25, photo: 'https://www.mumbaiindians.com/static-assets/images/players/large/action-shots/26718.png?v=5.64&w=400' },
         { id: 'new_lungi', name: 'Lungi Ngidi', role: 'PACER', nationality: 'South Africa', basePrice: 1.0, photo: 'https://d1k8sn41pix00a.cloudfront.net/media/players/photos/Lungi_Ngidi.png' },
         { id: 'new_ashwiniKu', name: 'Ashwani Kumar', role: 'PACER', nationality: 'India', basePrice: 0.3, photo: 'https://d1k8sn41pix00a.cloudfront.net/media/players/photos/Ashwani_Kumar.webp' },
         { id: 'new_akashS', name: 'Akash Singh', role: 'PACER', nationality: 'India', basePrice: 0.3, photo: 'https://iplcricbet.com/wp-content/uploads/2024/07/Akash-Singh.jpg' },
@@ -1521,3 +1521,4 @@ document.addEventListener('DOMContentLoaded', () => {
         renderTeamSelection();
     }
 });
+
